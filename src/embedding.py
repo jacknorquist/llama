@@ -1,35 +1,42 @@
-import os, json
+import os
+import json
+from pathlib import Path
+
 import chromadb
 from chromadb.utils import embedding_functions
-from pathlib import Path
-from sentence_transformers import SentenceTransformer
+from chromadb.config import Settings
+
 
 def preprocess_and_save(input_dir="data/raw", output_dir="data/processed"):
     os.makedirs(output_dir, exist_ok=True)
     for path in Path(input_dir).glob("*"):
         text = Path(path).read_text(encoding="utf-8")
         # TODO: better splitting (by paragraphs / tokens)
-        chunks = [text[i:i+2000] for i in range(0, len(text), 2000)]
+        chunks = [text[i:i + 2000] for i in range(0, len(text), 2000)]
         for idx, chunk in enumerate(chunks):
             out = Path(output_dir) / f"{path.stem}_{idx}.json"
             out.write_text(json.dumps({"text": chunk}))
 
-def create_and_populate_collection(processed_dir="data/processed", persist_dir="chroma_store"):
-    from chromadb.config import Settings
 
-    client = chromadb.Client(Settings(persist_directory=persist_dir))
+def create_and_populate_collection(processed_dir="data/processed", persist_dir="chroma_store"):
+    client = chromadb.PersistentClient(path=persist_dir)
 
     ef = embedding_functions.SentenceTransformerEmbeddingFunction(model_name="BAAI/bge-small-en-v1.5")
 
-    col = client.get_or_create_collection("rag_docs", embedding_function=ef)
+    collection = client.get_or_create_collection("rag_docs", embedding_function=ef)
+
     docs, ids = [], []
     for file in Path(processed_dir).glob("*.json"):
         data = json.loads(file.read_text())
         ids.append(file.stem)
         docs.append(data["text"])
 
-    col.add(documents=docs, ids=ids)
+    collection.add(documents=docs, ids=ids)
 
-    client.persist()
+    return collection
 
-    return col
+
+if __name__ == "__main__":
+    preprocess_and_save()
+    collection = create_and_populate_collection()
+

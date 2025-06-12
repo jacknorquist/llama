@@ -14,15 +14,22 @@ def preprocess_and_save(input_dir="data/raw", output_dir="data/processed"):
             out = Path(output_dir) / f"{path.stem}_{idx}.json"
             out.write_text(json.dumps({"text": chunk}))
 
-def create_and_populate_collection(processed_dir="data/processed"):
-    client = chromadb.Client()
-    ef = embedding_functions.SentenceTransformerEmbeddingFunction("all-MiniLM-L6-v2")
-    col = client.create_collection("rag_docs", embedding_function=ef)
+def create_and_populate_collection(processed_dir="data/processed", persist_dir="chroma_store"):
+    from chromadb.config import Settings
 
+    client = chromadb.Client(Settings(persist_directory=persist_dir))
+
+    ef = embedding_functions.SentenceTransformerEmbeddingFunction(model_name="BAAI/bge-small-en-v1.5")
+
+    col = client.get_or_create_collection("rag_docs", embedding_function=ef)
     docs, ids = [], []
     for file in Path(processed_dir).glob("*.json"):
         data = json.loads(file.read_text())
         ids.append(file.stem)
         docs.append(data["text"])
+
     col.add(documents=docs, ids=ids)
+
+    client.persist()
+
     return col

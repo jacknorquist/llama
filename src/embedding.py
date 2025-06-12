@@ -35,8 +35,21 @@ def create_and_populate_collection(processed_dir="data/processed", persist_dir="
 
     return collection
 
+def inspect_embeddings(collection, n=3):
+    results = collection.query(
+        query_texts=["placeholder query"],
+        n_results=n,
+        include=["documents", "embeddings"]
+    )
+
+    for i in range(n):
+        print(f"\n📄 Document {i+1}:")
+        print(results["documents"][i][:300] + "...")
+        print("🧬 Embedding preview:", results["embeddings"][i][:5])
+
 
 if __name__ == "__main__":
     preprocess_and_save()
     collection = create_and_populate_collection()
+    inspect_embeddings(collection)
 
